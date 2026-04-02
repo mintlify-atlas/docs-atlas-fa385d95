@@ -1,0 +1,106 @@
+---
+title: 'Context management'
+description: 'How the agent keeps the model focused within token budgets across long tasks.'
+---
+
+## Goal
+
+Context management is not about preserving everything. It is about ensuring the model always has access to the **most critical information** within a finite token budget.
+
+## What must be preserved
+
+These have the highest priority and must survive compaction:
+
+1. Current user task goal
+2. System hard rules and safety constraints
+3. User explicit preferences
+4. Most recent key tool results
+5. Active sub-task state
+6. Memory summary
+7. Latest compact summary
+
+## What can be compressed
+
+These should be trimmed or summarized first:
+
+- Old verbose logs
+- Repeated explanations
+- Redundant details of completed steps
+- Large batches of similar `read`/`search` results
+- Old `progress` messages
+
+## Context budget
+
+The runtime maintains multiple budget dimensions simultaneously:
+
+| Budget | Description |
+|---|---|
+| Token estimate | Rough count of tokens in the current message list |
+| Tool result chars | Maximum characters allowed from a single tool result |
+| Per-turn output | Maximum tokens the model should generate per turn |
+| Task budget (optional) | Total token limit for the entire task |
+
+## Compaction triggers
+
+Compaction should be triggered when:
+
+- Pre-call token estimate exceeds a threshold
+- Total tool result volume is too large
+- The model returns a "prompt too long" error
+- A session is being rebuilt on resume
+
+## Compaction strategy
+
+Apply strategies in order of increasing cost:
+
+<Steps>
+  <Step title="Lightweight trimming">
+    Drop duplicate `progress` messages. Truncate oversized tool output tails. Remove irrelevant attachments.
+  </Step>
+  <Step title="Summary compaction">
+    Condense older messages into a single `summary` message using a model call.
+  </Step>
+  <Step title="Boundary marking">
+    Insert a `compact_boundary` message to mark the compaction point for future resume.
+  </Step>
+</Steps>
+
+## Sub-task context rules
+
+### Fork sub-tasks
+
+- Inherit necessary parent context to complete the task
+- Maintain a cache-friendly prefix for prompt reuse
+- Do not feed all intermediate noise back to the main thread on completion
+
+### Verification sub-tasks
+
+- Need: task goal, changed files, implementation summary
+- Do not need: the full noisy execution history
+
+## Tool result budgets
+
+<Warning>
+Without tool result budgeting, a single long `grep`, `read`, or shell output can exhaust the entire context window. Always apply a character budget to tool results before inserting them into messages.
+</Warning>
+
+## Pseudocode
+
+```python
+def manage_context(messages, budget):
+    messages = drop_ephemeral_progress(messages)
+    messages = trim_large_tool_results(messages, budget.tool_result_chars)
+
+    if estimate_tokens(messages) > budget.max_input_tokens:
+        summary = summarize_old_messages(messages)
+        messages = build_post_compact_messages(summary, messages)
+
+    return messages
+```
+
+## Acceptance criteria
+
+1. Long tasks do not crash due to unbounded context growth
+2. Key facts are recoverable after resume
+3. Sub-tasks do not flood the main thread with noise
+4. Oversized tool outputs are truncated to budget

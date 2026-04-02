@@ -1,0 +1,84 @@
+---
+title: 'Failure and recovery'
+description: 'How the agent handles the full range of failures — and recovers without losing task state.'
+---
+
+## Failures are normal
+
+Agent systems must treat failure as an expected operating condition, not an edge case. A robust runtime has an explicit strategy for every failure type.
+
+## Failure taxonomy
+
+| Type | Description |
+|---|---|
+| `tool_input_error` | The model generated invalid parameters for a tool call |
+| `permission_denied` | The permission system blocked a tool call |
+| `hook_blocked` | A pre-tool hook returned a deny decision |
+| `shell_runtime_error` | A shell command exited with a non-zero status |
+| `model_api_error` | The LLM API returned an error |
+| `prompt_too_long` | The request exceeded the model's context limit |
+| `mcp_connect_error` | An MCP server connection failed |
+| `task_killed` | A task was explicitly terminated |
+| `resume_load_error` | Session transcript could not be loaded on resume |
+| `session_storage_error` | Writing to the transcript store failed |
+
+## Handling strategies
+
+### `tool_input_error`
+Write the validation error back to the message stream. Do not execute the tool. The model receives the error and can self-correct on the next turn.
+
+### `permission_denied`
+Do not retry the identical call. Route the denial back to the model so it can adjust its approach or ask the user for guidance.
+
+### `hook_blocked`
+Return the block reason as a structured message. Allow the model or user to decide the next step.
+
+### `prompt_too_long`
+Trigger compaction or reactive compaction. Rebuild the message sequence after compaction and retry the model call.
+
+### `model_api_error`
+Preserve the error in the transcript. Attempt limited recovery (e.g., retry once with backoff). If unrecoverable, surface to the user.
+
+## Sub-task failure handling
+
+<Warning>
+A sub-task that fails silently is worse than no sub-task. Sub-task failures must be written to the task record, notified to the main thread, and logged with an error summary.
+</Warning>
+
+## Recovery strategies
+
+Recovery is tiered by severity:
+
+<AccordionGroup>
+  <Accordion title="Light recovery">
+    - Adjust tool input and retry
+    - Re-request permission with a different approach
+    - Short retry with backoff
+  </Accordion>
+  <Accordion title="Medium recovery">
+    - Compact context and retry the model call
+    - Rebuild sub-task context from a cleaner starting point
+  </Accordion>
+  <Accordion title="Heavy recovery">
+    - Resume the session from the last valid transcript point
+    - Escalate to the user for manual intervention
+    - Terminate and preserve all evidence for debugging
+  </Accordion>
+</AccordionGroup>
+
+## Session resume
+
+After an interruption, the system must:
+
+1. Load the transcript for the session
+2. Find the most recent `compact_boundary`
+3. Reconstruct the effective message history from that boundary forward
+4. Restore the session ID and project working directory
+5. Restore active task state or at least the task summary
+
+## Acceptance criteria
+
+1. All common failure types have an explicit handling path
+2. Sub-task failures are never silently lost
+3. A `prompt_too_long` error triggers compaction and retry
+4. An interrupted session can be resumed with task state intact

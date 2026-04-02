@@ -1,0 +1,101 @@
+---
+title: 'MVP scope'
+description: 'What to build first — and what to defer — when implementing a production agent runtime.'
+---
+
+## Goal
+
+Avoid unbounded expansion. The MVP must close a minimal end-to-end loop, proving the architecture works before adding features.
+
+## Must-have for MVP
+
+### Multi-turn main loop
+
+- Multi-turn query loop
+- `tool_call → tool_result → next_turn` cycle working correctly
+
+### Basic tools
+
+- Read file
+- Write file
+- Edit file
+- Search (grep / file find)
+- Shell command execution
+
+### Basic permission system
+
+- Allow / ask / deny decision engine
+- After a denial, the agent must not retry the identical call
+
+### Basic transcript and session
+
+- Persistent message storage
+- Session resume from transcript
+
+### Basic memory
+
+- User-level memory injection
+- Project-level memory injection
+- Simple memory file structure
+
+### Basic agent orchestration
+
+- Main agent (primary loop)
+- At least one verification agent
+- Optionally an explore or plan agent
+
+### Basic context compaction
+
+- Compact history when context grows too large
+- Apply tool result character budget
+
+## Defer to later
+
+These capabilities provide value but should not block the MVP:
+
+| Capability | Reason to defer |
+|---|---|
+| Full TUI | Zero impact on architecture correctness |
+| Remote execution | Significant complexity, not needed for local tasks |
+| Multi-user / swarm mode | Not in scope for single-developer MVP |
+| Advanced telemetry | Useful but not blocking |
+| Complex MCP delta updates | Simple MCP connection is sufficient |
+| Full plugin ecosystem | One skill and one MCP server are enough |
+
+## Recommended build order
+
+<Steps>
+  <Step title="Message model">
+    Define `Message`, `ToolUseBlock`, `ToolResultBlock`, and `SessionState` with stable schemas.
+  </Step>
+  <Step title="Main loop">
+    Implement `query_loop` with turn counting, tool dispatch, and termination conditions.
+  </Step>
+  <Step title="Tool execution chain">
+    Build the full pipeline: validate → pre-hooks → permission → execute → post-hooks → return.
+  </Step>
+  <Step title="Transcript and resume">
+    Persist messages. Implement session resume from a transcript file.
+  </Step>
+  <Step title="Memory">
+    Load and inject user and project memory into the system prompt.
+  </Step>
+  <Step title="Verification agent">
+    Independent agent that runs build / test / lint checks and returns a PASS/FAIL/PARTIAL verdict.
+  </Step>
+  <Step title="One extension">
+    Pick one of: skill loading, minimal plugin support, or a single MCP server connection.
+  </Step>
+</Steps>
+
+## Mistakes to avoid during MVP
+
+<Warning>
+Don't build a polished UI before the core loop is stable. Don't open bash access before the permission system exists. Don't add background tasks before transcript/resume works. These sequences cause architectural shortcuts that are expensive to undo.
+</Warning>
+
+## MVP success definition
+
+MVP is complete when this entire cycle works:
+
+> User gives a task → system advances multi-turn → calls tools → preserves context → compresses when needed → produces a result → session is resumable → basic verification confirms the result

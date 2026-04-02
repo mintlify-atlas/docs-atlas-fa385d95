@@ -1,0 +1,148 @@
+---
+title: 'Runtime loop'
+description: 'How the agent main loop works — from input to tool execution to termination.'
+---
+
+## Purpose
+
+The agent runtime loop is the core execution engine. It must:
+
+1. Continuously advance a task across multiple turns
+2. Re-decide after each tool result
+3. Handle permission denials, context compression, and tool failures gracefully
+4. Trigger sub-agents, background tasks, and verification tasks
+5. Produce a traceable message stream and transcript
+
+## Loop inputs
+
+A complete loop invocation requires:
+
+| Input | Description |
+|---|---|
+| `messages` | Current message sequence |
+| `system_prompt` | Fully assembled system prompt |
+| `tool_registry` | Available tools for this turn |
+| `tool_use_context` | Execution context: cwd, permissions, session, task state |
+| `memory_context` | Injected memory content |
+| `can_use_tool` | Permission check function |
+| `max_turns` | Maximum turns before forced stop |
+| `task_budget` | Optional per-task token budget |
+
+## Loop outputs per turn
+
+Each turn may produce one or more of:
+
+- A plain assistant message
+- A `tool_use` request
+- A `tool_result` written back to the message stream
+- A `progress` message
+- A `compact` or `summary` boundary message
+- A sub-task launch event
+- A terminal state (complete / failed / interrupted)
+
+## Explicit loop state
+
+The loop must maintain explicit state, not scatter it across local variables:
+
+```python
+class QueryState:
+    messages: list
+    turn_count: int
+    auto_compact_tracking: dict | None
+    pending_tool_summary: object | None
+    stop_hook_active: bool
+    max_output_recovery_count: int
+    has_attempted_reactive_compact: bool
+    transition_reason: str | None
+```
+
+## Single-turn execution order
+
+Each turn follows a fixed sequence:
+
+<Steps>
+  <Step title="Pre-process messages">
+    Drop ephemeral progress messages. Apply any pending tool summaries.
+  </Step>
+  <Step title="Check context budget">
+    Estimate token count. If over threshold, trigger compaction before the model call.
+  </Step>
+  <Step title="Call the model">
+    Send messages and system prompt to the LLM client. Collect the response.
+  </Step>
+  <Step title="Parse the response">
+    Determine whether the response is a message, a tool call, or a terminal signal.
+  </Step>
+  <Step title="Execute tool calls">
+    For each tool call: validate → check permission → execute → write result back to messages.
+  </Step>
+  <Step title="Compact if needed">
+    After tool results, re-evaluate context size. Compact if a threshold is crossed.
+  </Step>
+  <Step title="Decide whether to continue">
+    Check termination conditions. If all are clear, increment `turn_count` and loop.
+  </Step>
+</Steps>
+
+## Termination conditions
+
+The loop stops when any of these are met:
+
+- The model signals task completion
+- `max_turns` is reached
+- The user interrupts
+- A permission denial has no viable alternative
+- An unrecoverable exception occurs
+- The task is backgrounded or delegated
+
+## Tool call handling rules
+
+<Warning>
+Tool results must always be written back to the message stream. Displaying a result only in the UI without writing it to context is a critical bug — the model will not see it on the next turn.
+</Warning>
+
+- Execute tool calls in declared order (or by orchestration policy)
+- Write every `tool_result` back to messages, including failures
+- Structure failure information — do not silently swallow errors
+
+## Pseudocode
+
+```python
+def query_loop(params):
+    state = init_state(params)
+
+    while True:
+        if should_stop(state, params):
+            return terminal_result(state)
+
+        state = maybe_compact(state, params)
+        request = build_model_request(state, params)
+        response = call_model(request)
+        state.messages.append(response.assistant_message)
+
+        if response.tool_calls:
+            tool_events = run_tools(response.tool_calls, params)
+            state.messages.extend(tool_events)
+            state.transition_reason = 'tool_round'
+            continue
+
+        if response.should_launch_subagent:
+            launch_subagent(response, params)
+            state.transition_reason = 'subagent'
+            continue
+
+        if response.is_terminal:
+            return terminal_result(state)
+
+        state.turn_count += 1
+```
+
+## Acceptance criteria
+
+A correct implementation must:
+
+1. Handle consecutive multi-turn tasks
+2. Feed tool results back so they influence the next turn
+3. Compress context rather than crashing when it grows too long
+4. Allow sub-tasks to interrupt the main flow
+5. Produce a complete, replayable transcript

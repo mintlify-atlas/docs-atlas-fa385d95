@@ -1,0 +1,135 @@
+---
+title: 'Architecture map'
+description: 'A capability map of all major subsystems and how they relate.'
+---
+
+## Overview
+
+The agent is not a model-centric product. It is a **runtime operating system** where the model is one component. The architecture is organized as layered capability zones.
+
+## Capability zones
+
+### A. Entry layer
+
+| Capability | Description |
+|---|---|
+| CLI entrypoint | `agt` command via `argparse` |
+| Agent initialization | Constructs `Agent`, registers tools, loads skills |
+| SDK integration | Importable `Agent` class for embedding |
+| MCP entrypoint | Future: accept MCP protocol connections |
+
+### B. Prompt assembly layer
+
+| Capability | Description |
+|---|---|
+| Dynamic system prompt | Assembled per-session from static + dynamic sections |
+| Environment injection | OS, working directory, git state, active tools |
+| Language and style | User preference for response language and format |
+| Memory injection | User, project, and session memory merged into prompt |
+| MCP instruction injection | Tool descriptions from connected MCP servers |
+
+### C. Tool execution layer
+
+| Capability | Description |
+|---|---|
+| Tool discovery | Registry lookup by name |
+| Input validation | Schema and business logic validation |
+| Permission resolution | Allow / ask / deny decision |
+| PreToolUse hooks | Custom checks before execution |
+| Tool execution | Handler function call |
+| Telemetry recording | Timing, input, output logging |
+| PostToolUse hooks | Custom checks after execution |
+| Result budgeting | Character limit on tool outputs |
+| Result injection | Writing result back to message stream |
+
+### D. Agent scheduling layer
+
+| Capability | Description |
+|---|---|
+| Sub-agent launch | Fork a child agent with inherited context |
+| Background agents | Async execution with progress tracking |
+| Agent lifecycle management | Start, monitor, stop, collect output |
+| Context boundary control | Limit what each agent inherits and returns |
+
+### E. Extension layer
+
+| Capability | Description |
+|---|---|
+| Skills | Reusable workflow knowledge packages (SKILL.md discovery) |
+| Plugins | Command and capability surface extensions |
+| MCP integration | External tool servers via the MCP protocol |
+| Runtime capability listing | Expose discovered extensions to the model |
+
+### F. Memory and session layer
+
+| Capability | Description |
+|---|---|
+| User memory | Long-term preferences and collaboration rules |
+| Project memory | Project-specific background and conventions |
+| Session summary | Compressed summary of the current session |
+| Transcript persistence | Append-only message log per session |
+| Session resume | Reconstruct context from transcript |
+
+### G. Task and background layer
+
+| Capability | Description |
+|---|---|
+| Task registration | Create a `TaskRecord` for every agent action |
+| Task status tracking | `pending → running → completed/failed/cancelled` |
+| Background task execution | Independent agent process with output file |
+| Progress updates | Incremental progress written to task record |
+| Completion notification | Structured notification to main thread on finish |
+
+### H. Quality assurance layer
+
+| Capability | Description |
+|---|---|
+| Verification agent | Independent agent that checks implementation |
+| Build / test / lint checks | Command execution with real output |
+| Adversarial probes | Edge case and negative input testing |
+| PASS / FAIL / PARTIAL verdict | Structured quality report with evidence |
+
+### I. Interface layer
+
+| Capability | Description |
+|---|---|
+| CLI output | Streaming text to stdout |
+| Permission prompts | User confirmation for `ask`-mode operations |
+| Task progress display | Real-time status of active tasks |
+| Command system | Slash commands, skill invocation |
+
+## Cross-cutting concerns
+
+Three concerns span all layers:
+
+<AccordionGroup>
+  <Accordion title="Safety">
+    The prompt layer warns about risky actions. The tool layer validates and rate-limits. The hook layer can block any call. The UI layer prompts for user confirmation.
+  </Accordion>
+  <Accordion title="Context management">
+    Prompt assembly respects dynamic boundaries. Sessions support compression and resume. Agents inherit context with explicit boundaries. Skills and MCP are injected on demand.
+  </Accordion>
+  <Accordion title="Traceability">
+    Every subsystem must be trackable, resumable, extensible, and governable. This is not a nicety — it is a core product requirement.
+  </Accordion>
+</AccordionGroup>
+
+## Teaching implementation coverage
+
+The current `src/agt/` package covers a focused subset:
+
+| Zone | Status |
+|---|---|
+| Entry layer (CLI) | Implemented |
+| Tool execution (basic) | Implemented — `Tool`, `ToolResult`, `echo_tool` |
+| Skills (discovery) | Implemented — `load_skills()` via `SKILL.md` |
+| Memory (basic) | Implemented — `remember()` list |
+| Main loop | Implemented — `Agent.run()` with `max_turns` |
+| LLM interface | Implemented — `LLMClient` protocol + `FakeLLMClient` |
+| Permission system | Stub — `can_use_tool()` checks registration only |
+| Transcript / resume | Not yet implemented |
+| Verification agent | Not yet implemented |
+| Background tasks | Not yet implemented |
+| Context compaction | Not yet implemented |
+
+This incremental structure is intentional. See [MVP scope](/implementation/mvp-scope) for the recommended build order.

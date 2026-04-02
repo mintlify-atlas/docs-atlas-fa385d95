@@ -1,0 +1,130 @@
+---
+title: 'Message model'
+description: 'The structured message types and session state that drive the agent runtime.'
+---
+
+## Why the message model must be defined first
+
+This agent system is not driven by function calls — it is driven by **structured messages that produce state transitions**. If the message model is unstable, memory, resume, tool execution, and sub-agent tasks will all be inconsistent.
+
+## Message types
+
+The runtime requires at least these message types:
+
+| Type | Description |
+|---|---|
+| `system` | System prompt, injected at conversation start |
+| `user` | Human input |
+| `assistant` | Model response (text and/or tool calls) |
+| `tool_use` | Tool invocation request from the model |
+| `tool_result` | Tool execution result written back to context |
+| `progress` | High-frequency status updates (UI only, not core transcript) |
+| `attachment` | Structured system events (hook blocks, notifications, MCP context) |
+| `summary` | Compressed representation of older messages |
+| `compact_boundary` | Marker showing where compaction occurred |
+| `notification` | Background task completion or failure notification |
+
+## Core message fields
+
+All messages share a base structure:
+
+```python
+class BaseMessage:
+    id: str
+    type: str
+    created_at: float
+    parent_id: str | None   # enables transcript replay and resume
+    session_id: str
+```
+
+### Assistant message
+
+```python
+class AssistantMessage(BaseMessage):
+    content_blocks: list    # text blocks and tool_use blocks
+    usage: dict | None      # token usage from the model API
+    stop_reason: str | None
+```
+
+### User message
+
+```python
+class UserMessage(BaseMessage):
+    content_blocks: list
+    source: str | None      # "human", "tool_result", "notification", etc.
+```
+
+### Tool use block
+
+```python
+class ToolUseBlock:
+    id: str
+    name: str
+    input: dict
+```
+
+### Tool result block
+
+```python
+class ToolResultBlock:
+    tool_use_id: str        # must match the originating ToolUseBlock.id
+    content: str | list
+    is_error: bool = False
+```
+
+## Why `parent_id` matters
+
+The parent chain enables:
+
+- **Transcript replay** — walk the chain to reconstruct any point in time
+- **Session resume** — rebuild effective context after compaction
+- **History repair** — patch broken chains after a compact boundary
+
+## Progress messages
+
+`progress` messages are high-frequency UI events. They:
+
+- Can be displayed in the interface
+- Must **not** participate in the core parent chain
+- Must **not** pollute the model context on resume
+
+## Session state object
+
+Beyond messages, the runtime maintains an explicit session state:
+
+```python
+class SessionState:
+    session_id: str
+    cwd: str
+    current_task_id: str | None
+    memory_summary: str | None
+    active_agent_ids: list[str]
+    current_permission_mode: str
+    token_budget_state: dict | None
+```
+
+## Compact boundary
+
+When context is compressed, a `compact_boundary` message is inserted. This enables:
+
+- Knowing which history was summarized
+- Loading only the necessary portion on resume
+- Keeping the message chain parseable
+
+## Transcript storage requirements
+
+The transcript store must support:
+
+- Sequential append
+- Load by session ID
+- Load sub-agent side chains independently
+- Read tail summary without loading the full file
+- Safe handling of large files (do not load everything into memory)
+
+## Acceptance criteria
+
+1. Every conversation turn can be serialized as structured messages
+2. `tool_use` and `tool_result` can be matched one-to-one by ID
+3. `progress` messages do not appear in the resumed model context
+4. A session can be fully reconstructed from its message chain
+5. Sub-agent transcripts are stored independently from the main session

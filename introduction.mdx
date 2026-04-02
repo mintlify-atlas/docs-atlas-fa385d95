@@ -7,8 +7,8 @@ description: 'A deep-dive into AI agent architecture — research docs and a min
 
 AI Agent Deep Dive is a research and teaching project that reverse-engineers the product requirements of a production-grade AI coding agent. It combines:
 
-- **Architecture research docs** — 17 documents that reconstruct the product design of a real AI coding agent runtime, written from a product manager's perspective.
-- **A minimal Python agent** — a clean, pedagogical implementation (`agt`) demonstrating the core structure every agent needs: main loop, tool system, skills discovery, LLM interface, and CLI.
+- **Architecture research docs** — 17 documents that reverse the product design of a real AI coding agent runtime, written from a product manager's perspective without leaking source code.
+- **A minimal Python agent** — a clean, pedagogical implementation (`agt`) that demonstrates the core structure every agent needs: main loop, tool system, skills discovery, LLM interface, and CLI.
 
 The goal is not to build a clone, but to understand *why* each design decision exists — and provide a stable skeleton for learning and further development.
 
@@ -31,7 +31,7 @@ The goal is not to build a clone, but to understand *why* each design decision e
 
 Most chat models answer once and stop. Simple agents call tools but lack governance. A real engineering agent needs:
 
-- Stable multi-turn execution with termination conditions
+- Stable multi-turn execution
 - A governed tool pipeline with permissions and hooks
 - Context management that survives long tasks
 - Extensible skills, plugins, and external tool integrations
@@ -46,10 +46,10 @@ ai-agent-deep-dive/
 ├── src/agt/          # Teaching Python agent
 │   ├── agent.py      # Core Agent class, Tool, Message, LLMClient
 │   └── cli.py        # CLI entrypoint (agt command)
-├── docs/             # Architecture research documents
+├── docs/             # Architecture research documents (Chinese)
 └── pyproject.toml    # Poetry project, Python ≥ 3.11
 ```
 
 ## Research reports
 
-The project also ships two PDF reports that summarize the full architectural analysis. See [Research Reports](/reference/report-overview).
+The project also ships two PDF reports (`ai-agent-deep-dive.pdf`, `ai-agent-deep-dive-v2.pdf`) that summarize the full architectural analysis. See [Research Reports](/reference/report-overview).

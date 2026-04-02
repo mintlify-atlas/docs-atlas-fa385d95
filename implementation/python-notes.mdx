@@ -1,0 +1,127 @@
+---
+title: 'Python implementation notes'
+description: 'How to extend the teaching implementation toward a production agent runtime.'
+---
+
+## Implementation philosophy
+
+The goal is not to replicate any specific product line-for-line. The goal is to rebuild the same **product capability structure** in Python — understanding why each module exists before implementing it.
+
+<Note>
+Prioritize clarity over feature richness. A well-structured, easily testable core is more valuable than a wide but tangled feature set.
+</Note>
+
+## Recommended module structure
+
+Organize the codebase by runtime responsibility, not by feature name:
+
+```
+src/
+├── agt/
+│   ├── runtime/       # query loop, orchestration
+│   ├── messages/      # message schemas and serialization
+│   ├── tools/         # tool registry and execution pipeline
+│   ├── permissions/   # permission engine (allow/ask/deny)
+│   ├── memory/        # memory loading and injection
+│   ├── tasks/         # background task model
+│   ├── storage/       # transcript and session persistence
+│   ├── agents/        # agent role definitions
+│   ├── extensions/    # skills, plugins, MCP
+│   └── verification/  # verification runner
+```
+
+## Data model recommendations
+
+Use typed, serializable data structures from the start:
+
+- Use `dataclasses` or `pydantic` for `Message`, `TaskRecord`, and `SessionState`
+- Use SQLite or JSONL for transcript persistence — both are simple and resumable
+- Use explicit service classes instead of implicit global state
+
+The teaching implementation already uses `@dataclass` for `Message` and `ToolResult`:
+
+```python
+@dataclass
+class Message:
+    role: str
+    content: str
+    meta: dict[str, Any] = field(default_factory=dict)
+
+@dataclass
+class ToolResult:
+    ok: bool
+    content: str
+    meta: dict[str, Any] = field(default_factory=dict)
+```
+
+## Swapping the LLM
+
+The `FakeLLMClient` is intentionally replaceable. To connect a real LLM, implement the `LLMClient` protocol:
+
+```python
+class LLMClient(Protocol):
+    def stream_text(self, messages: list[Message]) -> Iterator[str]:
+        ...
+```
+
+For example, to use the OpenAI API (requires `pip install openai` — not included by default):
+
+```python
+import openai
+
+class OpenAIClient:
+    def __init__(self, model: str = "gpt-4o"):
+        self.model = model
+        self.client = openai.OpenAI()
+
+    def stream_text(self, messages: list[Message]) -> Iterator[str]:
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[{"role": m.role, "content": m.content} for m in messages],
+            stream=True,
+        )
+        for chunk in response:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+```
+
+Then inject it:
+
+```python
+agent = Agent(llm=OpenAIClient())
+```
+
+## What not to build first
+
+Avoid these common early mistakes:
+
+| Temptation | Why to defer |
+|---|---|
+| Complex TUI | UI polish adds no architecture value early on |
+| Multiple agent types | Start with one stable loop before branching |
+| Vector database memory | Simple file-based memory is sufficient for MVP |
+| Full MCP support | Start with a single MCP server or skip for now |
+| Complex concurrency | Async is an optimization, not a requirement for correctness |
+
+## Development milestones
+
+<Steps>
+  <Step title="Milestone 1 — Core runtime">
+    Message model, query loop, basic tools (read/write/grep/shell), transcript persistence.
+  </Step>
+  <Step title="Milestone 2 — Session management">
+    Permission system (allow/ask/deny), memory injection, session resume, context compaction.
+  </Step>
+  <Step title="Milestone 3 — Quality and extensions">
+    Verification agent, simple skill loading, background local agent tasks.
+  </Step>
+  <Step title="Milestone 4 — Ecosystem">
+    Minimal MCP support, worktree isolation, richer interface.
+  </Step>
+</Steps>
+
+## First milestone success criteria
+
+Milestone 1 is complete when this full loop works end-to-end:
+
+> User gives task → system advances multi-turn → invokes tools → preserves context → compresses if needed → produces result → session is resumable → basic verification runs

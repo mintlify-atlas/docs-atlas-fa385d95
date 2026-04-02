@@ -1,0 +1,95 @@
+---
+title: 'Task model'
+description: 'How agent actions are tracked as structured tasks with lifecycle, status, and background execution.'
+---
+
+## Purpose
+
+The task system converts "what an agent is doing" into a trackable object — not just text in a conversation. Every agent action has a lifecycle, and that lifecycle must be observable.
+
+## Task types
+
+| Type | Description |
+|---|---|
+| `main_session_task` | The primary task being worked on in the current session |
+| `local_agent_task` | A foreground sub-agent task in the current process |
+| `background_agent_task` | A sub-agent running independently in the background |
+| `shell_task` | A shell command tracked as a task |
+| `verification_task` | A quality-check run by the verification agent |
+| `remote_task` | Remote execution (defer to later milestone) |
+
+## Task record schema
+
+```python
+class TaskRecord:
+    task_id: str
+    type: str
+    session_id: str
+    parent_task_id: str | None
+    agent_id: str | None
+    description: str
+    status: str
+    created_at: float
+    started_at: float | None
+    finished_at: float | None
+    output_path: str | None
+    error: str | None
+    result_summary: str | None
+    progress: dict | None
+```
+
+## Task state machine
+
+```
+pending → running → completed
+                 → failed
+                 → cancelled
+                 → killed
+running → waiting_permission
+running → backgrounded
+```
+
+All state transitions must be explicit and recorded.
+
+## Background task requirements
+
+A background agent task must support:
+
+1. **Registration** — task is created and tracked before the agent starts
+2. **Progress updates** — intermediate state is written to the record
+3. **Output storage** — results are written to a file path, not just memory
+4. **Completion notification** — main thread receives a structured notification when done
+5. **Failure notification** — failures are not silently dropped
+6. **Kill / cancel** — tasks can be terminated by the user or main agent
+
+## Progress tracking fields
+
+A task's progress record must include at minimum:
+
+- Tool call count for this task
+- Token usage so far
+- Most recent activity timestamp
+- Most recent activity summary (human-readable)
+
+## Output file requirement
+
+<Tip>
+Background tasks should write their results to a persistent file path. This enables the main thread to read the output after it completes, allows resume after interruption, and creates an audit record.
+</Tip>
+
+## Notification mechanism
+
+When a task ends (success or failure), the system must inject a structured `notification` message into the main thread — not silently complete. The notification must include:
+
+- Task ID
+- Status (completed / failed)
+- Result summary or error description
+- Output file path (if applicable)
+
+## Acceptance criteria
+
+1. Every sub-agent can be registered as a task
+2. Background tasks are queryable by status
+3. Tasks can write output to a file
+4. Completion and failure both trigger main-thread notifications
+5. Tasks can be stopped on demand

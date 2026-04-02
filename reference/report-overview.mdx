@@ -1,0 +1,87 @@
+---
+title: 'Research reports'
+description: 'The PDF deep-dive reports that document the full AI agent architecture analysis.'
+---
+
+## Overview
+
+This project ships two PDF research reports that document a comprehensive reverse-engineering of a production AI coding agent's product design.
+
+| Report | Description |
+|---|---|
+| `ai-agent-deep-dive.pdf` | Version 1 — initial architectural analysis |
+| `ai-agent-deep-dive-v2.pdf` | Version 2 — updated and extended analysis (latest) |
+
+<Note>
+The v2 report is the current, complete version. Start here if you are reading the research for the first time.
+</Note>
+
+## What the reports cover
+
+The reports reconstruct the product requirements and architectural decisions of a production AI coding agent runtime from a product manager's perspective — without leaking implementation source code.
+
+### Covered topics
+
+<CardGroup cols={2}>
+  <Card title="Product overview" icon="bullseye" href="/concepts/product-overview">
+    Core users, problems solved, and top-level system capabilities.
+  </Card>
+  <Card title="System prompt orchestration" icon="sliders" href="/architecture/system-prompt-orchestration">
+    Dynamic prompt assembly, caching, and multi-agent role design.
+  </Card>
+  <Card title="Tool execution pipeline" icon="wrench" href="/architecture/tools-permissions">
+    Tool governance, permissions, hooks, and execution chain.
+  </Card>
+  <Card title="Skills, plugins, and MCP" icon="puzzle-piece" href="/architecture/skills-plugins-mcp">
+    The three-layer extensibility runtime.
+  </Card>
+  <Card title="Memory and session" icon="brain" href="/architecture/memory-session">
+    Multi-layer memory, session transcripts, and resume.
+  </Card>
+  <Card title="Verification and quality" icon="shield-check" href="/reference/verification-quality">
+    Independent verification agent and evidence-based quality assurance.
+  </Card>
+</CardGroup>
+
+## Reading order
+
+If this is your first time reading the research:
+
+<Steps>
+  <Step title="Product overview">
+    Start with `00-product-overview` to understand what the product is trying to achieve and why simpler approaches fall short.
+  </Step>
+  <Step title="Memory and session">
+    Read `04-memory-and-session` — memory architecture is one of the most underappreciated design challenges.
+  </Step>
+  <Step title="Tools and permissions">
+    Read `02-tools-permissions-and-execution` to understand why a governed tool pipeline is essential.
+  </Step>
+  <Step title="Skills, plugins, and MCP">
+    Finish with `03-skills-plugins-mcp` and `06-verification-and-quality` for the extensibility and quality assurance layers.
+  </Step>
+</Steps>
+
+## Documentation structure
+
+The 17 source documents (`docs/`) are organized as:
+
+| Document | Topic |
+|---|---|
+| `00` | Product overview |
+| `01` | System prompt and orchestration |
+| `02` | Tools, permissions, and execution |
+| `03` | Skills, plugins, and MCP |
+| `04` | Memory and session |
+| `05` | Commands, UI, and operator experience |
+| `06` | Verification and quality |
+| `07` | Architecture map |
+| `08` | Agent runtime loop |
+| `09` | Message model and state |
+| `10` | Context management |
+| `11` | Task model |
+| `12` | Workspace and isolation |
+| `13` | Failure and recovery |
+| `14` | Configuration system |
+| `15` | MVP scope |
+| `16` | Python implementation notes |

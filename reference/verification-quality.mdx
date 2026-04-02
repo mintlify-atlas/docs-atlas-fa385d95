@@ -1,0 +1,124 @@
+---
+title: 'Verification and quality'
+description: 'How the verification agent independently checks implementations and produces evidence-based verdicts.'
+---
+
+## Why "done" is not enough
+
+In AI coding agents, the biggest quality risk is the model reporting task completion without actually verifying the result. The system must treat verification as an independent, first-class capability — not an afterthought.
+
+## Verification system goals
+
+1. Independently check whether the implementation is actually functional
+2. Prevent the agent from claiming completion based only on reading code
+3. Prevent happy-path bias by actively seeking failure cases
+4. Produce evidence-based verdicts, not self-assessment
+
+## Verification agent design
+
+### Role separation
+
+The verification agent is a **separate agent** from the implementation agent. This prevents the implementer from grading their own work.
+
+### Default mindset
+
+The verification agent's job is to **find problems**, not to rationalize a passing result.
+
+### Prohibited actions
+
+The verification agent must not:
+- Modify any project files
+- Install dependencies
+- Use write operations to mask or work around failures
+
+## Supported check types
+
+| Check type | Description |
+|---|---|
+| Build | Compile or build the project and check for errors |
+| Test suite | Run the full test suite and capture pass/fail counts |
+| Lint / type-check | Run linters and type checkers |
+| Interface validation | Call the actual API or CLI and verify responses |
+| CLI validation | Test real input/output of command-line interfaces |
+| Migration validation | Verify schema migrations apply cleanly |
+| Adversarial probes | Test edge cases, invalid inputs, boundary conditions |
+
+## Required output format
+
+Every verification run must produce a structured report with:
+
+- Check title
+- Command that was run
+- Actual output from the command
+- `PASS`, `FAIL`, or `PARTIAL` result per check
+- A unified final verdict
+
+Example:
+
+```
+## Build check
+Command: poetry run python -m py_compile src/agt/agent.py
+Output: (no output — success)
+Result: PASS
+
+## Test suite
+Command: poetry run pytest
+Output:
+  collected 5 items
+  5 passed in 0.12s
+Result: PASS
+
+## Verdict: PASS
+```
+
+## Adversarial probes
+
+Checking only the happy path misses the majority of real bugs. The verification agent must actively test:
+
+- Boundary inputs (empty string, maximum length, zero)
+- Invalid types or missing required fields
+- Concurrent or repeated requests
+- References to non-existent resources
+- Unexpected ordering of operations
+
+## Why verification must be traceable
+
+If a verification run has no command and no output, users cannot determine:
+- Whether testing actually occurred
+- What was tested
+- Where a failure occurred
+
+**Evidence-based verification** is a hard requirement, not a style preference.
+
+## Quality assurance beyond testing
+
+The full quality system includes multiple layers:
+
+| Layer | Mechanism |
+|---|---|
+| Prompt layer | Engineering behavior rules that prohibit false claims of completion |
+| Verification agent | Independent runtime checks with real commands |
+| Execution chain | Tool call logs and session transcript |
+| Failure traceability | Every failure recorded with context for post-mortem |
+
+## Pseudocode
+
+```python
+class VerificationRunner:
+    def verify(self, task, changed_files, context):
+        checks = build_verification_plan(task, changed_files)
+        results = []
+        for check in checks:
+            cmd = check.command
+            output = run(cmd)
+            results.append(evaluate(output, check.expectation))
+        return summarize_verdict(results)
+```
+
+## Acceptance criteria
+
+1. Verification is independent from implementation
+2. Every check includes the actual command and output
+3. Adversarial probes are part of every verification run
+4. Final verdict is `PASS`, `FAIL`, or `PARTIAL` with full evidence
+5. Verification agent cannot write to the project directory

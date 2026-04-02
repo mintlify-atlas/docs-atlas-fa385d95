@@ -1,0 +1,102 @@
+{
+  "projectType": "ai-ml",
+  "projectName": "AI Agent Deep Dive",
+  "projectDescription": "A teaching-oriented deep-dive into AI agent architecture, featuring a minimal Python agent implementation and comprehensive research documentation on agent runtime design patterns.",
+  "theme": "palm",
+  "primaryColor": "#5B4FBE",
+  "lightColor": "#EAE8FF",
+  "darkColor": "#2D2870",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Agent Concepts",
+            "pages": [
+              "concepts/product-overview",
+              "concepts/runtime-loop",
+              "concepts/message-model",
+              "concepts/context-management"
+            ]
+          },
+          {
+            "group": "Architecture",
+            "pages": [
+              "architecture/system-prompt-orchestration",
+              "architecture/tools-permissions",
+              "architecture/skills-plugins-mcp",
+              "architecture/memory-session",
+              "architecture/task-model",
+              "architecture/workspace-isolation",
+              "architecture/failure-recovery"
+            ]
+          },
+          {
+            "group": "Implementation Guide",
+            "pages": [
+              "implementation/python-notes",
+              "implementation/mvp-scope",
+              "implementation/configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Reference",
+        "groups": [
+          {
+            "group": "Code Reference",
+            "pages": [
+              "reference/agent-api",
+              "reference/cli",
+              "reference/architecture-map"
+            ]
+          },
+          {
+            "group": "Research Reports",
+            "pages": [
+              "reference/report-overview",
+              "reference/verification-quality"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Minimal Python agent implementation with pluggable LLM interface",
+    "Comprehensive deep-dive research documentation on AI agent design",
+    "Tool registration and execution system with permission controls",
+    "Skills discovery mechanism via SKILL.md convention",
+    "Streaming LLM output with FakeLLM for local development",
+    "Multi-turn agent runtime loop with max_turns safeguard",
+    "Message model with role-based conversation history",
+    "CLI entrypoint (agt) powered by argparse",
+    "Agent orchestration: main agent, verification agent, subagents",
+    "Memory system for session context injection"
+  ],
+  "publicApiSurface": [
+    "Agent(llm=None) — main agent class",
+    "Agent.run(user_input: str) -> str — execute agent main loop",
+    "Agent.register_tool(tool: Tool) -> None — register a callable tool",
+    "Agent.load_skills(skills_dir: str | Path) -> list[str] — discover skills",
+    "Agent.remember(text: str) -> None — add to memory",
+    "Agent.can_use_tool(tool_name: str) -> bool — permission check",
+    "Tool(name, description, handler) — tool definition",
+    "Tool.call(payload: dict) -> ToolResult — invoke a tool",
+    "ToolResult(ok: bool, content: str, meta: dict) — tool output",
+    "Message(role: str, content: str, meta: dict) — conversation message",
+    "LLMClient.stream_text(messages) -> Iterator[str] — LLM protocol",
+    "FakeLLMClient — local test LLM implementation",
+    "echo_tool(payload: dict) -> ToolResult — built-in echo tool",
+    "CLI: agt <prompt> [--skills-dir DIR] [--list-skills]"
+  ]
+}

@@ -1,0 +1,327 @@
+---
+title: 'Agent API reference'
+description: 'Complete reference for every class and function in the agt Python package.'
+---
+
+## Overview
+
+The `agt` package exposes a small, composable API. The public exports are declared in `src/agt/__init__.py`:
+
+```python
+from agt import Agent, Message, Tool, ToolResult
+```
+
+For the test/teaching helpers (`FakeLLMClient`, `echo_tool`), import directly from the module:
+
+```python
+from agt.agent import FakeLLMClient, echo_tool
+```
+
+---
+
+## `Agent`
+
+The core agent class. Manages message history, tools, memory, and runs the main loop.
+
+```python
+class Agent:
+    def __init__(self, llm: LLMClient | None = None) -> None
+```
+
+<ParamField path="llm" type="LLMClient | None">
+  An optional LLM client implementing the `LLMClient` protocol. Defaults to `FakeLLMClient` if not provided.
+</ParamField>
+
+### Attributes
+
+| Attribute | Type | Description |
+|---|---|---|
+| `messages` | `list[Message]` | Full conversation history for this agent instance |
+| `tools` | `dict[str, Tool]` | Registered tools, keyed by tool name |
+| `memory` | `list[str]` | Simple memory list for teaching purposes |
+| `max_turns` | `int` | Maximum turns before the loop stops (default: 20) |
+| `llm` | `LLMClient` | Active LLM client |
+
+### Methods
+
+#### `run(user_input)`
+
+Run the agent main loop for a given user input.
+
+```python
+def run(self, user_input: str) -> str
+```
+
+<ParamField path="user_input" type="str" required>
+  The user's input text to process.
+</ParamField>
+
+Returns the agent's final text response.
+
+**Loop behavior:**
+1. Appends the user input as a `"user"` message
+2. Calls `model_step()` each turn
+3. If the step returns `"message"`, saves it as `"assistant"` and returns
+4. If the step returns `"tool_call"`, dispatches the tool and continues
+5. Stops after `max_turns` turns
+
+```python
+agent = Agent()
+reply = agent.run("What files are in this directory?")
+print(reply)
+```
+
+---
+
+#### `register_tool(tool)`
+
+Register a tool so the agent can call it.
+
+```python
+def register_tool(self, tool: Tool) -> None
+```
+
+<ParamField path="tool" type="Tool" required>
+  A `Tool` instance to register.
+</ParamField>
+
+```python
+agent = Agent()
+agent.register_tool(Tool("echo", "Echo input text", echo_tool))
+```
+
+---
+
+#### `load_skills(skills_dir)`
+
+Discover skills in a directory by finding `SKILL.md` files recursively.
+
+```python
+def load_skills(self, skills_dir: str | Path) -> list[str]
+```
+
+<ParamField path="skills_dir" type="str | Path" required>
+  Root directory to search for skills. Each skill is a subdirectory containing a `SKILL.md` file.
+</ParamField>
+
+Returns a list of discovered skill names (their parent directory names).
+
+```python
+skills = agent.load_skills("./skills")
+# ["code-review", "test-writer"]
+```
+
+---
+
+#### `remember(text)`
+
+Add a string to the agent's simple memory list.
+
+```python
+def remember(self, text: str) -> None
+```
+
+<ParamField path="text" type="str" required>
+  The text to add to memory.
+</ParamField>
+
+---
+
+#### `add_message(role, content, **meta)`
+
+Append a message to the conversation history.
+
+```python
+def add_message(self, role: str, content: str, **meta: Any) -> None
+```
+
+<ParamField path="role" type="str" required>
+  Message role: `"user"`, `"assistant"`, or `"tool_result"`.
+</ParamField>
+<ParamField path="content" type="str" required>
+  Message text content.
+</ParamField>
+<ParamField path="**meta" type="Any">
+  Optional keyword arguments stored in `message.meta`.
+</ParamField>
+
+---
+
+#### `can_use_tool(tool_name)`
+
+Check whether a tool is currently available (registered).
+
+```python
+def can_use_tool(self, tool_name: str) -> bool
+```
+
+<ParamField path="tool_name" type="str" required>
+  Name of the tool to check.
+</ParamField>
+
+Returns `True` if the tool is registered, `False` otherwise. Future versions will add permission-level checking.
+
+---
+
+#### `call_llm_stream()`
+
+Call the bound LLM client and return a streaming text iterator. This is the primary abstraction layer between the agent loop and the LLM implementation.
+
+```python
+def call_llm_stream(self) -> Iterator[str]
+```
+
+Returns a string iterator yielding text chunks. When swapping in a real LLM, only the `LLMClient` implementation needs to change — not this method or the loop.
+
+---
+
+#### `model_step()`
+
+Execute one model step: call the LLM via `call_llm_stream()`, collect all chunks, and return a step descriptor dict.
+
+```python
+def model_step(self) -> dict[str, Any]
+```
+
+Returns a dict with:
+- `"type"`: `"message"` (current implementation; `"tool_call"` is handled by the loop for future extension)
+- `"content"`: assembled full text response
+- `"chunks"`: list of raw text chunks from the LLM stream
+
+---
+
+## `Tool`
+
+Represents a callable tool that can be registered with an agent.
+
+```python
+class Tool:
+    def __init__(
+        self,
+        name: str,
+        description: str,
+        handler: Callable[[dict[str, Any]], ToolResult],
+    )
+```
+
+<ParamField path="name" type="str" required>
+  Unique tool name used for lookup and dispatch.
+</ParamField>
+<ParamField path="description" type="str" required>
+  Human-readable description of what the tool does.
+</ParamField>
+<ParamField path="handler" type="Callable[[dict], ToolResult]" required>
+  The function that executes the tool logic. Takes a dict of inputs, returns a `ToolResult`.
+</ParamField>
+
+### `call(payload)`
+
+Execute the tool.
+
+```python
+def call(self, payload: dict[str, Any]) -> ToolResult
+```
+
+<ParamField path="payload" type="dict[str, Any]" required>
+  Input parameters for the tool handler.
+</ParamField>
+
+---
+
+## `ToolResult`
+
+The return value from any tool execution.
+
+```python
+@dataclass
+class ToolResult:
+    ok: bool
+    content: str
+    meta: dict[str, Any] = field(default_factory=dict)
+```
+
+<ResponseField name="ok" type="bool">
+  Whether the tool executed successfully.
+</ResponseField>
+<ResponseField name="content" type="str">
+  Text content returned to the agent by the tool.
+</ResponseField>
+<ResponseField name="meta" type="dict">
+  Optional metadata (e.g. timing, file path, hit count).
+</ResponseField>
+
+---
+
+## `Message`
+
+A single message in the conversation history.
+
+```python
+@dataclass
+class Message:
+    role: str
+    content: str
+    meta: dict[str, Any] = field(default_factory=dict)
+```
+
+<ResponseField name="role" type="str">
+  Message role. Common values: `"user"`, `"assistant"`, `"tool_result"`.
+</ResponseField>
+<ResponseField name="content" type="str">
+  The text body of the message.
+</ResponseField>
+<ResponseField name="meta" type="dict">
+  Arbitrary metadata. For `"assistant"` messages, includes `turn` and `chunks`. For `"tool_result"` messages, includes `ok`, `tool`, `tool_input`, and `tool_meta`.
+</ResponseField>
+
+---
+
+## `LLMClient` protocol
+
+The interface any LLM client must implement to be usable with `Agent`.
+
+```python
+class LLMClient(Protocol):
+    def stream_text(self, messages: list[Message]) -> Iterator[str]:
+        ...
+```
+
+<ParamField path="messages" type="list[Message]" required>
+  The current conversation history.
+</ParamField>
+
+Returns an iterator that yields text chunks (strings) as they are produced.
+
+---
+
+## `FakeLLMClient`
+
+A built-in test LLM that echoes the last user message back in streaming chunks. Requires no API key.
+
+```python
+class FakeLLMClient:
+    def stream_text(self, messages: list[Message]) -> Iterator[str]
+```
+
+**Behavior:** Finds the last `"user"` message, prepends `"[fake-llm] 你刚才说的是："`, then yields the result in 8-character chunks.
+
+---
+
+## `echo_tool`
+
+A built-in example tool that echoes its input text back.
+
+```python
+def echo_tool(payload: dict[str, Any]) -> ToolResult
+```
+
+<ParamField path="payload" type="dict">
+  Expected key: `"text"` (str). Falls back to empty string if missing.
+</ParamField>
+
+Returns `ToolResult(ok=True, content="echo: <text>")`.
+
+```python
+result = echo_tool({"text": "hello"})
+# ToolResult(ok=True, content="echo: hello", meta={})
+```

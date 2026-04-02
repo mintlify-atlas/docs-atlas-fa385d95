@@ -1,0 +1,127 @@
+---
+title: 'Tools and permissions'
+description: 'The governed tool execution pipeline — from discovery to result, with permissions and hooks.'
+---
+
+## Why tools require governance
+
+If the model can call any tool without restriction, it becomes a liability. The product must upgrade tool access from "callable" to "governable."
+
+## Required tool categories
+
+At minimum, the runtime needs:
+
+| Category | Examples |
+|---|---|
+| File operations | Read file, write file, edit file |
+| Search | Search files by name, search file contents |
+| Shell | Execute shell commands |
+| Task management | Create and update to-do items |
+| User interaction | Ask for clarification, request confirmation |
+| Sub-agent | Launch child agents |
+| External | MCP tool calls |
+
+## Tool execution pipeline
+
+Tool calls must pass through a formal pipeline — not go directly from model decision to execution:
+
+<Steps>
+  <Step title="Find tool">
+    Look up the tool by name in the registry. Fail fast if not found.
+  </Step>
+  <Step title="Validate input schema">
+    Check that the model-supplied input matches the tool's declared schema.
+  </Step>
+  <Step title="Run custom validation">
+    Apply any tool-specific business logic validation beyond the schema.
+  </Step>
+  <Step title="Run PreToolUse hooks">
+    Allow registered hooks to inspect, modify, or block the call before execution.
+  </Step>
+  <Step title="Permission decision">
+    Resolve allow / ask / deny based on current mode, user rules, project rules, and hook suggestions.
+  </Step>
+  <Step title="Execute">
+    Run the tool with the (possibly hook-modified) input.
+  </Step>
+  <Step title="Record telemetry">
+    Log the call, input, output, and timing.
+  </Step>
+  <Step title="Run PostToolUse hooks">
+    Allow registered hooks to inspect or act on the result.
+  </Step>
+  <Step title="Format and return">
+    Apply result budget limits and write the result back to the message stream.
+  </Step>
+</Steps>
+
+## Permission system
+
+### Permission decision sources
+
+| Source | Description |
+|---|---|
+| Current mode | Global allow/ask/deny setting |
+| User rules | Long-term per-user permission policies |
+| Project rules | Per-project permission policies |
+| Hook decision | Runtime hook override |
+| Tool safety policy | Tool-specific special handling |
+
+### After a denial
+
+<Warning>
+If a tool call is denied, the agent must not mechanically retry the same call. It must understand the denial signal, adjust its approach, and if necessary ask the user for clarification.
+</Warning>
+
+## Hooks
+
+Hooks let organizational rules enter the runtime without modifying the core agent.
+
+### What hooks can do
+
+- Return an explanatory message
+- Block execution entirely
+- Modify the tool input
+- Suggest allow / ask / deny
+- Inject additional context
+
+### Why hooks are necessary
+
+Without hooks, tool governance is limited to what the product ships. With hooks, teams can inject custom checks — security policies, compliance rules, domain-specific guards — into any point in the tool lifecycle.
+
+## Shell tool special treatment
+
+Shell commands have higher risk than file read/write tools and require:
+
+- Stricter default permission policy
+- Possible pre-execution classifier check
+- Stronger audit trail
+
+## Tool result requirements
+
+Tool results must be:
+
+- Human-readable for debugging
+- Traceable back to the originating call
+- Processable by PostToolUse hooks
+- Part of the session transcript
+- Subject to result character budgets
+
+## Pseudocode
+
+```python
+def execute_tool(tool_name, raw_input, context):
+    tool = find_tool(tool_name)
+    validated = schema_validate(tool, raw_input)
+    validated = run_custom_validation(tool, validated)
+
+    hook_result = run_pre_hooks(tool, validated, context)
+    decision = resolve_permission(hook_result, context)
+    if decision == 'deny':
+        return denied_result()
+
+    final_input = maybe_update_input(validated, hook_result)
+    output = tool.call(final_input)
+    run_post_hooks(tool, final_input, output, context)
+    return output
+```

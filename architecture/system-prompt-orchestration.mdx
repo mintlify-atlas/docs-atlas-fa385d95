@@ -1,0 +1,109 @@
+---
+title: 'System prompt and orchestration'
+description: 'Why system prompts must be dynamically assembled, and how multi-agent roles are designed.'
+---
+
+## Why the system prompt is not a fixed string
+
+The system prompt is a runtime control plane, not static copy. User environment, tool set, language preference, output style, session state, and MCP connections all change between sessions. A fixed template causes:
+
+- Rules that don't match the current session
+- Stale or missing tool descriptions
+- Memory that cannot be injected
+- Uncontrolled token costs
+
+## Static vs. dynamic sections
+
+The prompt is split into two layers to enable caching:
+
+| Layer | Content | Caching |
+|---|---|---|
+| Static prefix | Identity, engineering behavior rules, risk action rules, tool usage syntax | Cache-friendly — rarely changes |
+| Dynamic suffix | Environment info, language preference, output style, session rules, memory, MCP instructions | Changes per session |
+
+Separating these layers keeps cache hit rates high while allowing full flexibility.
+
+## Required static sections
+
+- **Identity** — The agent is an execution collaborator for software engineering tasks, not a chat assistant
+- **Engineering behavior rules** — Don't add unrequested features, don't over-abstract, don't claim verification without running it, read before modifying, don't create unnecessary files
+- **Risk action rules** — Explicitly flag operations with high blast radius: delete, push, external visibility, shared state modification
+- **Tool usage syntax** — When to read files, when to search, when to edit, when to use shell, when to call tools in parallel
+
+## Required dynamic sections
+
+1. Environment information (OS, cwd, git state, active tools)
+2. Language preference
+3. Output style preference
+4. Session-local rules
+5. Memory content
+6. MCP instructions
+7. Scratchpad / temp workspace rules
+8. Token budget hint
+
+## Pseudocode
+
+```python
+class SystemPromptBuilder:
+    def build(self, env, tools, memory, output_style, language, mcp_info):
+        static_sections = [
+            intro(),
+            system_rules(),
+            task_rules(),
+            action_safety(),
+            tool_usage_rules(),
+        ]
+        dynamic_sections = [
+            env_section(env),
+            language_section(language),
+            output_style_section(output_style),
+            memory_section(memory),
+            mcp_section(mcp_info),
+        ]
+        return static_sections + dynamic_sections
+```
+
+## Agent orchestration
+
+### Why one agent is not enough
+
+Different task phases require different behavioral modes:
+
+| Phase | Required behavior |
+|---|---|
+| Explore | Read-only, broad search |
+| Plan | Structured output, no side effects |
+| Implement | Write access, executable actions |
+| Verify | Adversarial checking, independent from implementation |
+
+Mixing all roles in a single agent reduces stability and increases error rates.
+
+### Required agent roles
+
+- **General execution agent** — primary task implementor
+- **Explore agent** — read-only, maps the codebase
+- **Plan agent** — structured decomposition, no writes
+- **Verification agent** — independent quality checks
+
+### Sub-agent context handoff
+
+When the main agent launches a sub-agent, it must provide sufficient context:
+
+- Task objective
+- Known background
+- Constraints
+- Expected output format
+
+A vague handoff ("do this") produces poor sub-agent results.
+
+### Sub-agent isolation modes
+
+| Mode | Use case |
+|---|---|
+| `fork` | Sub-task inherits parent context, reduces main thread pollution |
+| `background` | Runs independently, reports completion via notification |
+| `worktree` | Isolated file system, avoids polluting the main branch |
+
+## Summary
+
+> The system prompt layer exists to assemble product rules, tool syntax, session state, and environment constraints into a dynamically generated, cache-optimized, multi-role runtime control plane.

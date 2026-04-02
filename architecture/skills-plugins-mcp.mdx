@@ -1,0 +1,126 @@
+---
+title: 'Skills, plugins, and MCP'
+description: 'The extensibility layer — skills for workflow knowledge, plugins for capability surfaces, MCP for external tools.'
+---
+
+## Why built-in capabilities are not enough
+
+Hardcoding all agent capabilities produces a system that:
+
+- Cannot be extended without code changes
+- Cannot adapt to different team workflows
+- Cannot carry domain-specific knowledge
+- Cannot build a tool ecosystem
+
+The solution is a three-layer extensibility runtime.
+
+## Skills
+
+A skill is a reusable workflow knowledge package — not a help document.
+
+### What a skill encodes
+
+- Rules for a specific category of task
+- Context and background for that task type
+- A standard operating procedure (SOP) for execution
+- Tool boundaries that apply to this task
+
+### Why skills are a first-class primitive
+
+Skills ensure that when the model encounters a specific task type, it loads the right workflow knowledge rather than improvising from scratch each time.
+
+### Skill requirements
+
+1. The runtime must be able to list available skills
+2. The model must be able to invoke a skill at the right moment
+3. Skill content must be injectable into the session
+4. Skills must support frontmatter metadata
+5. Skills can declare `allowed-tools` constraints
+6. Skills must not be loaded more than once per session
+
+### Skills in the teaching implementation
+
+The `Agent.load_skills()` method discovers skills by recursively finding `SKILL.md` files:
+
+```python
+def load_skills(self, skills_dir: str | Path) -> list[str]:
+    skills_path = Path(skills_dir)
+    if not skills_path.exists():
+        return []
+
+    loaded: list[str] = []
+    for path in sorted(skills_path.rglob("SKILL.md")):
+        loaded.append(path.parent.name)
+    return loaded
+```
+
+Skills are organized as directories. The directory name becomes the skill name.
+
+## Plugins
+
+Plugins extend the agent's capability surface for operators and developers. They are not user-facing scripts — they inject new behavior into the model's runtime.
+
+### What plugins provide
+
+- New slash commands
+- New skill directories
+- Frontmatter configuration
+- Runtime variable substitution
+- Tool constraints for plugin-scoped tasks
+- Declarations of user-callable vs. system-only commands
+- Hints for `effort` level and model selection
+
+## MCP (Model Context Protocol)
+
+MCP provides a standardized protocol for connecting the agent to external tool servers.
+
+### Why MCP exists
+
+- Uniform protocol to integrate external tools
+- Tools arrive with their own descriptions (no manual prompt engineering)
+- Enables ecosystem growth without changing the core agent
+
+### MCP requirements
+
+1. Connect to external MCP servers
+2. Fetch tool definitions from each server
+3. Inject tool usage instructions into the runtime
+4. Support per-agent MCP server configuration
+5. Clean up server connections at session end
+
+## Three-layer relationship
+
+<CardGroup cols={3}>
+  <Card title="Skills" icon="book">
+    Encode *how to do a specific task type*. Workflow knowledge.
+  </Card>
+  <Card title="Plugins" icon="puzzle-piece">
+    Extend *what the system can do*. Capability surface.
+  </Card>
+  <Card title="MCP" icon="plug">
+    Connect *external tools and their descriptions*. Ecosystem integration.
+  </Card>
+</CardGroup>
+
+All three layers must be exposed to the model as discoverable capabilities. An extension that the model cannot perceive will not be used.
+
+## Pseudocode
+
+```python
+class ExtensionRuntime:
+    def load_skills(self, cwd):
+        return discover_skill_packages(cwd)
+
+    def load_plugins(self):
+        return discover_plugins()
+
+    def connect_mcp_servers(self, configs):
+        return [connect(server) for server in configs]
+
+    def expose_capabilities_to_model(self, skills, plugins, mcp_servers):
+        return build_runtime_capability_listing(skills, plugins, mcp_servers)
+```
+
+## Summary
+
+> Skills encode workflow knowledge. Plugins extend capability surfaces. MCP integrates external tools. Together they give the system a continuously growing ecosystem of capabilities.

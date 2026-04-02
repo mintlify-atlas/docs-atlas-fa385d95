@@ -1,0 +1,93 @@
+---
+title: 'Product overview'
+description: 'What a production AI coding agent actually needs to solve — and why chat models fall short.'
+---
+
+## What this product is
+
+A production AI coding agent is not a chat model with tool access bolted on. It is an interactive execution system for software engineering tasks that unifies:
+
+- Reasoning and multi-turn task execution
+- Tool governance and permission control
+- Task decomposition and sub-agent delegation
+- Memory, session management, and context budgets
+- Extensibility through skills, plugins, and external integrations
+
+## The problem with simpler approaches
+
+### Chat models
+
+Ordinary chat models are limited to one-shot answers. They have no stable execution capability, no tool governance, no task state, and no long-term context management. They cannot form extensible workflows.
+
+### Simple agents
+
+Simple agents can call tools, but they typically suffer from:
+
+- Behavior drift across turns
+- Tool misuse without governance
+- No permission boundaries
+- Context pollution
+- Untrackable task progress
+- No post-execution verification
+- No graceful extensibility
+
+The core product requirement is therefore:
+
+> How do you upgrade "model + tools" into a usable, controlled, extensible, production-grade software engineering execution system?
+
+## Core users
+
+- Independent developers
+- Software engineers
+- Technical product managers
+- Operators who want AI to execute tasks, not just suggest
+
+Users want to:
+- Have AI actually execute tasks, not just advise
+- Have AI modify real projects and verify results
+- Have AI sustain multi-turn progress on a task
+- Integrate AI into their own tools and workflows
+
+## Top-level capabilities
+
+A production agent requires at least these first-order capabilities:
+
+<AccordionGroup>
+  <Accordion title="System prompt orchestration">
+    Dynamic assembly of system prompts that incorporate environment, tools, language, memory, and MCP state — not a static template.
+  </Accordion>
+  <Accordion title="Tool discovery, execution, and governance">
+    A formal execution pipeline: find tool → validate input → run hooks → check permissions → execute → record → post-hooks → return result.
+  </Accordion>
+  <Accordion title="Multi-agent scheduling">
+    Launch sub-agents (explore, plan, implement, verify), manage their lifecycle, and control context boundaries between them.
+  </Accordion>
+  <Accordion title="Skills, plugins, and MCP extensions">
+    Load reusable workflow knowledge (skills), inject new capability surfaces (plugins), and connect external tools via the MCP protocol.
+  </Accordion>
+  <Accordion title="Memory and session management">
+    Persist user preferences, project context, and session transcripts. Compress context when budgets are tight. Resume after interruption.
+  </Accordion>
+  <Accordion title="Task model and background execution">
+    Track every agent action as a structured task with status, progress, and lifecycle events. Support background execution with notifications.
+  </Accordion>
+  <Accordion title="Verification and quality assurance">
+    A dedicated verification agent that independently checks implementations via build, test, lint, and adversarial probes — producing evidence-based verdicts.
+  </Accordion>
+  <Accordion title="Telemetry and traceability">
+    Every turn is logged to a transcript. Every tool call is auditable. Every session can be replayed.
+  </Accordion>
+</AccordionGroup>
+
+## Non-functional requirements
+
+| Requirement | Description |
+|---|---|
+| Safety | Dangerous operations must be interceptable. External tool results must be treated as potentially untrusted. Users must control permission boundaries. |
+| Recoverability | Sessions are resumable. Task state is trackable. Sub-task lifecycles are cleanable. |
+| Extensibility | External tools, custom skills, and plugins can inject commands, skills, and behavioral constraints. |
+| Cost control | Prompt assembly must consider cache boundaries. Context usage must respect budgets. Long tasks must support compression and summarization. |
+
+## The one-sentence product requirement
+
+> Users need not a chat model, but an AI software engineering operating system that can continuously advance tasks in real engineering environments, respect constraints, invoke tools, decompose work, preserve context, and produce verifiable results.

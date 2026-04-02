@@ -1,0 +1,90 @@
+---
+title: 'Configuration system'
+description: 'How configuration sources, priority, and agent-level settings are organized.'
+---
+
+## Purpose
+
+The configuration system manages the agent's default behavior, user preferences, project constraints, and extension metadata — without scattering them through application code.
+
+## Configuration sources
+
+Listed in order from lowest to highest priority:
+
+| Priority | Source | Description |
+|---|---|---|
+| 5 (lowest) | Default configuration | Shipped with the product |
+| 4 | User global configuration | Per-user long-term preferences |
+| 3 | Project configuration | Per-project `.agent` or config file |
+| 2 | Session configuration | Per-session overrides |
+| 1 (highest) | CLI arguments / runtime override | Explicit user flags at invocation time |
+
+## What must be configurable
+
+Every operator must be able to adjust these without modifying source code:
+
+- **Default model** — which LLM to use
+- **Language** — response language
+- **Output style** — verbosity, format
+- **Permission mode** — global allow / ask / deny default
+- **Hook configuration** — which hooks are active and their settings
+- **MCP server configuration** — server URLs, auth, enabled servers
+- **Plugin paths** — where to discover plugins
+- **Skill paths** — where to discover skills
+- **Token / task budget** — limits on token usage or task cost
+- **Auto-compact toggle** — whether to automatically compact context
+- **Transcript persistence toggle** — whether to persist sessions to disk
+
+## Agent-level configuration
+
+Each agent role should support independent configuration:
+
+```python
+class AgentConfig:
+    agent_type: str             # "main", "explore", "plan", "verify"
+    when_to_use: str            # description of when to invoke this agent
+    allowed_tools: list[str]
+    disallowed_tools: list[str]
+    model: str
+    memory_scope: str           # "full", "project", "session"
+    mcp_servers: list[str]
+    background_capable: bool
+    isolation_mode: str         # "shared", "read_only", "temp", "worktree"
+```
+
+## Plugin and skill configuration
+
+Plugins and skills can carry frontmatter configuration. The runtime merges this into the active configuration at load time, following the same priority rules.
+
+Example skill frontmatter:
+
+```yaml
+---
+name: my-skill
+description: Handles TypeScript migrations
+allowed-tools:
+  - read_file
+  - edit_file
+  - bash
+effort: high
+---
+```
+
+## Configuration system in the teaching implementation
+
+The current `cli.py` provides two configuration points:
+
+```python
+parser.add_argument("prompt", nargs="?", default="请开始")
+parser.add_argument("--skills-dir", default="skills")
+parser.add_argument("--list-skills", action="store_true")
+```
+
+These map to the CLI-level configuration source (highest priority). Future development should add a config file loader that reads from `~/.config/agt/config.toml` (user-level) and `.agt/config.toml` (project-level).
+
+## Acceptance criteria
+
+1. Users can change runtime behavior without modifying source code
+2. Projects can define constraints that override user defaults
+3. Sessions can temporarily override project configuration
+4. Skills and plugins can attach their own configuration metadata

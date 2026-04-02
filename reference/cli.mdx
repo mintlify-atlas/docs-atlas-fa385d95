@@ -1,0 +1,136 @@
+---
+title: 'CLI reference'
+description: 'Complete reference for the agt command-line interface.'
+---
+
+## Overview
+
+The `agt` CLI is the entrypoint for the teaching agent. It is installed via Poetry as a script and maps to `agt.cli:main`.
+
+```bash
+poetry run agt [OPTIONS] [PROMPT]
+```
+
+## Commands
+
+### `agt [PROMPT]`
+
+Run the agent with a user prompt.
+
+```bash
+poetry run agt "Summarize the project structure"
+```
+
+If no prompt is given, the default is `"请开始"` (Chinese for "please begin").
+
+```bash
+# Uses default prompt
+poetry run agt
+```
+
+**Output:** The agent's text response is printed to stdout.
+
+## Options
+
+### `--skills-dir DIR`
+
+Directory to search for skills. The agent recursively finds `SKILL.md` files in this directory and treats each parent folder as a skill.
+
+```bash
+poetry run agt --skills-dir ./skills "Write a unit test"
+```
+
+**Default:** `skills` (relative to the current working directory)
+
+If the directory does not exist, skill loading is skipped silently.
+
+### `--list-skills`
+
+List all skills discovered in `--skills-dir` and exit without running the agent.
+
+```bash
+poetry run agt --skills-dir ./skills --list-skills
+```
+
+**Output:** One skill name per line, then exits with code `0`.
+
+```
+code-review
+test-writer
+doc-writer
+```
+
+## Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | Success |
+
+## Source reference
+
+The CLI is implemented in `src/agt/cli.py`:
+
+```python cli.py
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="agt",
+        description="Teaching-oriented AI agent CLI"
+    )
+    parser.add_argument("prompt", nargs="?", default="请开始")
+    parser.add_argument(
+        "--skills-dir",
+        default="skills",
+        help="Directory containing skill folders with SKILL.md",
+    )
+    parser.add_argument(
+        "--list-skills",
+        action="store_true",
+        help="List discovered skills and exit",
+    )
+    return parser
+```
+
+## Skills directory layout
+
+Skills must follow this convention:
+
+```
+skills/
+├── code-review/
+│   └── SKILL.md       ← skill named "code-review"
+├── test-writer/
+│   └── SKILL.md       ← skill named "test-writer"
+└── doc-writer/
+    └── SKILL.md       ← skill named "doc-writer"
+```
+
+The skill name is the **directory name**, not the filename.
+
+## Examples
+
+<CodeGroup>
+
+```bash Run with a prompt
+poetry run agt "List the Python files in this project"
+```
+
+```bash List skills
+poetry run agt --skills-dir ./my-skills --list-skills
+```
+
+```bash Custom skills directory with prompt
+poetry run agt --skills-dir /home/user/shared-skills "Refactor the auth module"
+```
+
+</CodeGroup>
+
+## Poetry script configuration
+
+The CLI is registered in `pyproject.toml`:
+
+```toml pyproject.toml
+[tool.poetry.scripts]
+agt = "agt.cli:main"
+```
+
+After `poetry install`, `agt` is available as a command in the Poetry shell.

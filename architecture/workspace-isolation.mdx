@@ -1,0 +1,59 @@
+---
+title: 'Workspace isolation'
+description: 'How different agent roles are given appropriate file system access through workspace isolation modes.'
+---
+
+## Why isolation is required
+
+Without workspace isolation:
+
+- Sub-tasks can corrupt each other's state
+- Verification agents can accidentally modify the project
+- Experimental fork tasks can pollute the main branch
+- Risk action boundaries become undefined
+
+Different agent roles need different file system access — this must be enforced at the runtime level, not just requested via prompt.
+
+## Isolation modes
+
+| Mode | Description | Typical use |
+|---|---|---|
+| `shared_workspace` | Default mode, shared project directory | Main agent |
+| `read_only_workspace` | No write access | Explore, plan, verification agents |
+| `temp_workspace` | Write access only to a temporary directory | Temporary scripts, test artifacts |
+| `worktree_workspace` | Isolated git worktree | High-risk implementation tasks, experiments |
+| `remote_workspace` | Remote execution environment | Future milestone |
+
+## Role-to-isolation mapping
+
+| Agent role | Recommended isolation |
+|---|---|
+| Explore agent | `read_only` |
+| Plan agent | `read_only` |
+| Verification agent | `read_only` + `temp` writable |
+| General implementation agent | `shared` or `worktree` |
+| High-risk implementation task | `worktree` |
+
+## Path translation
+
+When a sub-task runs in a `worktree` workspace, it may inherit context that references paths from the parent workspace. The system must handle path translation or re-read files from the correct location.
+
+## Cleanup requirements
+
+When an isolated workspace ends, the system must clean up:
+
+- Temporary files
+- Temporary directories
+- Worktree entries (if applicable)
+- Orphaned child processes
+
+<Warning>
+Failing to clean up worktrees can leave the git repository in a degraded state. Isolation cleanup must be treated as a required lifecycle event, not optional housekeeping.
+</Warning>
+
+## Acceptance criteria
+
+1. Read-only agents cannot modify project files
+2. Verification agents can only write to their temp directory
+3. Worktree tasks do not affect the main project directory
+4. Isolation resources are cleaned up when tasks end

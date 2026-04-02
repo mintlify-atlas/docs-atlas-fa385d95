@@ -1,0 +1,127 @@
+---
+title: 'Memory and session'
+description: 'Multi-layer memory, session transcripts, and how context is preserved across turns and sessions.'
+---
+
+## Why memory is necessary
+
+An agent that only uses its current context window cannot:
+
+- Remember long-term user preferences
+- Retain project background across sessions
+- Recover key facts after context compression
+- Build cumulative collaboration continuity
+
+## Memory layers
+
+Memory is organized in four layers:
+
+<AccordionGroup>
+  <Accordion title="User-level memory">
+    Long-lived preferences that persist across all sessions:
+    - Language preference
+    - Output style preference
+    - Common working habits
+    - Collaboration rules that apply universally
+  </Accordion>
+  <Accordion title="Project-level memory">
+    Context tied to a specific project directory:
+    - Project background and goals
+    - Common commands (build, test, lint)
+    - Testing and build conventions
+    - Persistent requirements from project spec files
+  </Accordion>
+  <Accordion title="Session-level memory">
+    State for the current session:
+    - Current task goal
+    - Currently known context
+    - Intermediate state within the current execution
+    - Local decisions made during this session
+  </Accordion>
+  <Accordion title="Sub-task-level memory">
+    Context scoped to a child agent:
+    - Sub-agent task objective
+    - Sub-agent local context
+    - Context inherited from the parent on fork
+    - State specific to explore / plan / verify roles
+  </Accordion>
+</AccordionGroup>
+
+## Core memory requirements
+
+### Persistence
+The system must persist:
+- User long-term preferences
+- Project background
+- Session summaries
+- Resumable task metadata
+
+### Injection
+Memory must be re-injected into context at the right moment — not permanently stuffed into every request. Over-injection dilutes the model's attention and wastes tokens.
+
+### Compression
+When approaching context limits, the system must:
+- Automatically summarize history
+- Preserve critical facts in the summary
+- Reduce token cost without losing task continuity
+
+### Resume
+After an interruption, the system must:
+- Restore the task state
+- Restore critical context
+- Continue the execution chain
+
+## Why memory ≠ "dump all history"
+
+<Warning>
+Naively including the full conversation history in every request causes rising costs, diluted attention, useful information being buried in noise, and sub-task pollution of the main thread. Memory must be selectively extracted, compressed, and injected.
+</Warning>
+
+## Sub-task memory inheritance
+
+Sub-tasks have two conflicting needs:
+1. Enough parent context to complete the task
+2. No intermediate noise that pollutes the main thread
+
+The system must therefore:
+- Support bounded context inheritance (parent → child)
+- Summarize sub-task output before returning it to the main thread
+- Maintain cache-friendly context prefixes for reuse
+
+## Session management
+
+### Session identity
+Every session needs a unique ID for: resume, archive, analysis, sharing, and task lifecycle tracking.
+
+### Session transcripts
+Transcripts persistently record the key message stream:
+- User inputs
+- Model outputs
+- Tool call summaries
+- Sub-task results
+- Failure information
+
+### Session summaries
+The system must be able to auto-generate summaries for: history compression, subsequent resume, and quick context understanding.
+
+## Memory system pseudocode
+
+```python
+class MemorySystem:
+    def load_user_memory(self, user_id):
+        ...
+
+    def load_project_memory(self, project_root):
+        ...
+
+    def load_session_summary(self, session_id):
+        ...
+
+    def build_runtime_context(self, user_memory, project_memory, session_summary):
+        return merge_relevant_context(user_memory, project_memory, session_summary)
+
+    def compact_if_needed(self, messages):
+        if context_budget_low(messages):
+            return summarize(messages)
+        return messages
+```

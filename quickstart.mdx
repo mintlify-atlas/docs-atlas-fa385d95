@@ -1,80 +1,93 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: 'Quickstart'
+description: 'Install the teaching agent and run your first interaction in under 5 minutes.'
 ---
 
-## Get started in three steps
+## Prerequisites
 
-Get your documentation site running locally and make your first customization.
+- Python 3.11 or later
+- [Poetry](https://python-poetry.org/docs/#installation) for dependency management
 
-### Step 1: Set up your local environment
+## Installation
 
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
-    
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
-    
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/tvytlx/ai-agent-deep-dive.git
+    cd ai-agent-deep-dive
+    ```
+  </Step>
+  <Step title="Install dependencies">
+    ```bash
+    poetry install
+    ```
+  </Step>
+  <Step title="Run the agent">
+    ```bash
+    poetry run agt "hello"
+    ```
 
-### Step 2: Deploy your changes
+    You should see a streaming response from the built-in `FakeLLMClient`:
 
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
-    
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    ```
+    [fake-llm] 你刚才说的是：hello
+    ```
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Try the CLI options
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+**Send a custom prompt:**
+```bash
+poetry run agt "Please summarize what you can do"
+```
 
-### Step 3: Go live
+**List discovered skills from a directory:**
+```bash
+poetry run agt --skills-dir ./skills --list-skills
+```
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+**Use a custom skills directory:**
+```bash
+poetry run agt --skills-dir /path/to/your/skills "Start task"
+```
+
+<Note>
+The current implementation uses `FakeLLMClient`, which echoes your input back in a streaming fashion. This lets you test the agent loop without a real API key. See [Python implementation notes](/implementation/python-notes) for how to swap in a real LLM.
+</Note>
+
+## What just happened?
+
+When you run `agt "hello"`, the following sequence executes:
+
+1. `cli.py` parses arguments and creates an `Agent` instance
+2. The `echo` tool is registered
+3. Any skills in `--skills-dir` are discovered via `SKILL.md` files
+4. `agent.run("hello")` starts the main loop
+5. The agent calls `FakeLLMClient.stream_text()` and collects chunks
+6. The response is printed and the loop ends
+
+This is the core agent loop — the same pattern scales up to real LLMs, tool calls, and multi-turn tasks.
+
+## Run the tests
+
+```bash
+poetry run pytest
+```
 
 ## Next steps
 
-Now that you have your docs running, explore these key features:
-
 <CardGroup cols={2}>
-
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
-
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
-
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
-
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
-
+  <Card title="Agent concepts" icon="brain" href="/concepts/product-overview">
+    Understand the full product model behind this architecture.
+  </Card>
+  <Card title="Runtime loop" icon="rotate" href="/concepts/runtime-loop">
+    Learn how the multi-turn agent loop works.
+  </Card>
+  <Card title="Code reference" icon="code" href="/reference/agent-api">
+    Browse every class and method in the Python API.
+  </Card>
+  <Card title="MVP scope" icon="list-check" href="/implementation/mvp-scope">
+    See what to build first when extending the agent.
+  </Card>
 </CardGroup>
-
-<Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
-</Note>
